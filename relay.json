@@ -1,0 +1,6 @@
+{
+  "hot_update_port": 32023,
+  "routing_table": {
+    "google.com": "yahoo.com"
+  }
+}
