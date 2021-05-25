@@ -1,14 +1,17 @@
 mod error;
 mod config;
+mod processor;
 
 use nuclei::*;
 use std::net::TcpListener;
 
+use clap::*;
 use anyhow::Result;
 use async_dup::Arc as ADArc;
 use futures::prelude::*;
 use http_types::{Request, Response, StatusCode};
 use lever::prelude::LOTable;
+use crate::config::Config;
 
 /// Serves a request and returns a response.
 async fn serve(req: Request, rt: LOTable<String, String>) -> http_types::Result<Response> {
@@ -43,6 +46,24 @@ async fn listen(listener: Handle<TcpListener>, rt: LOTable<String, String>) -> R
 
 fn main() -> Result<()> {
     spawn_blocking(|| drive(future::pending::<()>()));
+
+    let matches = App::new("relay")
+        .version(crate_version!())
+        .author(crate_authors!("\n"))
+        .about("Relay - Reverse proxy server")
+        .arg(
+            Arg::with_name("debug")
+                .help("turn on debugging information")
+                .short("d"),
+        )
+        .args(&[
+            Arg::with_name("config")
+                .help("sets the config file to use")
+                .takes_value(true)
+                .short("c")
+                .long("config"),
+        ])
+        .get_matches();
 
     let routing_table: LOTable<String, String> = LOTable::new();
 
