@@ -1,4 +1,6 @@
 {
+  "host": "0.0.0.0",
+  "port": 8000,
   "hot_update_port": 32023,
   "routing_table": {
     "google.com": "yahoo.com"

@@ -2,6 +2,9 @@ mod error;
 mod config;
 mod processor;
 
+use tracing::*;
+use tracing_subscriber::FmtSubscriber;
+
 use nuclei::*;
 use std::net::TcpListener;
 
@@ -11,10 +14,11 @@ use async_dup::Arc as ADArc;
 use futures::prelude::*;
 use http_types::{Request, Response, StatusCode};
 use lever::prelude::LOTable;
+
 use crate::config::Config;
 
 /// Serves a request and returns a response.
-async fn serve(req: Request, rt: LOTable<String, String>) -> http_types::Result<Response> {
+async fn serve(req: Request, config: Config) -> http_types::Result<Response> {
     println!("Serving {}", req.url());
 
     let mut res = Response::new(StatusCode::Ok);
@@ -24,7 +28,7 @@ async fn serve(req: Request, rt: LOTable<String, String>) -> http_types::Result<
 }
 
 /// Listens for incoming connections and serves them.
-async fn listen(listener: Handle<TcpListener>, rt: LOTable<String, String>) -> Result<()> {
+async fn listen(listener: Handle<TcpListener>, config: Config) -> Result<()> {
     // Format the full host address.
     let host = format!("http://{}", listener.get_ref().local_addr()?);
     println!("Listening on {}", host);
@@ -35,7 +39,7 @@ async fn listen(listener: Handle<TcpListener>, rt: LOTable<String, String>) -> R
 
         // Spawn a background task serving this connection.
         let stream = ADArc::new(stream);
-        let rtc = rt.clone();
+        let rtc = config.clone();
         spawn(async move {
             if let Err(err) = async_h1::accept(stream, |req| serve(req, rtc.clone())).await {
                 println!("Connection error: {:#?}", err);
@@ -45,6 +49,8 @@ async fn listen(listener: Handle<TcpListener>, rt: LOTable<String, String>) -> R
 }
 
 fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
+
     spawn_blocking(|| drive(future::pending::<()>()));
 
     let matches = App::new("relay")
@@ -65,10 +71,20 @@ fn main() -> Result<()> {
         ])
         .get_matches();
 
-    let routing_table: LOTable<String, String> = LOTable::new();
+    let config = matches.value_of("config")
+        .map_or_else(|| {
+            info!("Config wasn't given. Falling back to defaults.");
+            Config::default()
+        }, |config_file| {
+            Config::default()
+                .with_config_file(config_file)
+                .build_with_config_file()
+                .expect("Config file is not readable.")
+        });
 
     block_on(async {
-        let http = listen(Handle::<TcpListener>::bind("0.0.0.0:8000")?, routing_table);
+        let http =
+            listen(Handle::<TcpListener>::bind(config.host_port())?, config);
 
         http.await;
         Ok(())
