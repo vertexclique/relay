@@ -5,7 +5,7 @@ use std::sync::Arc;
 use http_types::{Body, Request, Response, Error};
 use crate::errors::*;
 use isahc::{http as ih, RequestExt, ResponseExt, HttpClient};
-use isahc::{Body as IHBody};
+use isahc::{AsyncBody as IHBody};
 use std::io::{BufRead, Read};
 use futures::io::BufReader;
 use nuclei::{spawn_blocking, spawn};
