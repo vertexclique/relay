@@ -1,6 +1,6 @@
 use serde::*;
 use lever::prelude::LOTable;
-use crate::error::*;
+use crate::errors::*;
 use std::fs::File;
 use std::io::prelude::*;
 use std::collections::HashMap;

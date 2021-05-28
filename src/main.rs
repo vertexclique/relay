@@ -1,6 +1,7 @@
-mod error;
+mod errors;
 mod config;
 mod processor;
+mod context;
 
 use tracing::*;
 use tracing_subscriber::FmtSubscriber;
@@ -16,22 +17,19 @@ use http_types::{Request, Response, StatusCode};
 use lever::prelude::LOTable;
 
 use crate::config::Config;
+use crate::context::Context;
 
 /// Serves a request and returns a response.
-async fn serve(req: Request, config: Config) -> http_types::Result<Response> {
-    println!("Serving {}", req.url());
-
-    let mut res = Response::new(StatusCode::Ok);
-    res.insert_header("Content-Type", "text/plain");
-    res.set_body("Hello from async-h1!");
-    Ok(res)
+async fn serve(req: Request, context: Context) -> http_types::Result<Response> {
+    trace!("Serving {}", req.url());
+    context.traverse(req).await.map_err(http_types::Error::from)
 }
 
 /// Listens for incoming connections and serves them.
-async fn listen(listener: Handle<TcpListener>, config: Config) -> Result<()> {
+async fn listen(listener: Handle<TcpListener>, context: Context) -> Result<()> {
     // Format the full host address.
     let host = format!("http://{}", listener.get_ref().local_addr()?);
-    println!("Listening on {}", host);
+    info!("Listening on {}", host);
 
     loop {
         // Accept the next connection.
@@ -39,10 +37,10 @@ async fn listen(listener: Handle<TcpListener>, config: Config) -> Result<()> {
 
         // Spawn a background task serving this connection.
         let stream = ADArc::new(stream);
-        let rtc = config.clone();
+        let rtc = context.clone();
         spawn(async move {
             if let Err(err) = async_h1::accept(stream, |req| serve(req, rtc.clone())).await {
-                println!("Connection error: {:#?}", err);
+                error!("Connection error: {:#?}", err);
             }
         });
     }
@@ -76,15 +74,18 @@ fn main() -> Result<()> {
             info!("Config wasn't given. Falling back to defaults.");
             Config::default()
         }, |config_file| {
+            info!("Loading config from file.");
             Config::default()
                 .with_config_file(config_file)
                 .build_with_config_file()
                 .expect("Config file is not readable.")
         });
 
+    let context = Context::new(config);
+
     block_on(async {
         let http =
-            listen(Handle::<TcpListener>::bind(config.host_port())?, config);
+            listen(Handle::<TcpListener>::bind(context.config.host_port())?, context);
 
         http.await;
         Ok(())
