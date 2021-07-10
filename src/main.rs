@@ -2,6 +2,7 @@ mod errors;
 mod config;
 mod processor;
 mod context;
+mod jit;
 
 use tracing::*;
 use tracing_subscriber::FmtSubscriber;
