@@ -16,6 +16,10 @@ pub enum RelayError {
     ClientDispatch(#[from] isahc::http::Error),
     #[error("HTTP Error")]
     Http(#[from] isahc::Error),
+    #[error("JIT Instantiation Error")]
+    JITInstantiation(#[from] wasmer::InstantiationError),
+    #[error("JIT Compilation Error")]
+    JITCompilation(#[from] wasmer::CompileError),
     #[error("Processor execution problem `{0}`")]
     Processor(String),
 }
